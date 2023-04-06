@@ -4,7 +4,7 @@ from keras.models import load_model
 import numpy as np
 
 # 加载训练好的模型
-model = load_model('C:/Users/qqp/Documents/zuoye/maogou.h5')
+model = load_model('C:\Users\mcp\Desktop\cat_dog\maogou.h5')
 
 # 设置页面标题
 st.title('猫狗分类器')
