@@ -1,92 +1,124 @@
 import streamlit as st
-st.set_page_config(layout="wide")
+import pymysql
 from tensorflow.keras.utils import load_img
 from keras.models import load_model
 import numpy as np
 
-st.title('西华大学猫狗区分网')
+model = load_model('maogou.h5',compile=False)
+st.set_page_config(page_title="西华大学猫与狗区分网站",layout="wide")
 
-with st.expander('关于本网站'):
-  st.write('这个网站展示了如何识别猫猫和狗狗')
-  st.image('https://streamlit.io/images/brand/streamlit-logo-secondary-colormark-darktext.png', width=250)
+con = pymysql.connect(host="localhost", user="root", password="root",database="test1",charset="utf8")
 
-st.sidebar.header('欢迎光临')
-user_name = st.sidebar.text_input('您的名字？')
-user_emoji = st.sidebar.selectbox('选择一个 emoji 吧', ['', '😄', '😆', '😊', '😍', '😴', '😕', '😱'])
-user_food = st.sidebar.selectbox('您最喜欢的食物是什么呢？', ['', 'Tom Yum Kung', 'Burrito', 'Lasagna', 'Hamburger', 'Pizza'])
+c= con.cursor()
 
-st.header('你好，请输入你的基本信息，以便我们预测你喜欢猫还是喜欢狗')
+def create_usertable():
+    c.execute('CREATE TABLE IF NOT EXISTS userstable(username TEXT, password TEXT)')
 
-col1, col2, col3 = st.columns(3)
+def add_userdata(username,password):
 
-with col1:
-  if user_name != '':
-    st.write(f'👋 Hello {user_name}!')
-  else:
-    st.write('👈  请键入你的 **名字**!')
+     if c.execute('SELECT username FROM userstable WHERE username = %s',(username)):
+        st.warning("用户名已存在，请更换一个新的用户名。")
+     else:
+          c.execute('INSERT INTO userstable(username,password) VALUES(%s,%s)',(username,password))
+          con.commit()
+          st.success("恭喜，您已成功注册。")
+          st.info("请在左侧选择“登录”选项进行登录。")
 
-with col2:
-  if user_emoji != '':
-    st.write(f'{user_emoji}是你最喜欢的 **emoji**!')
-  else:
-    st.write('👈 请选择一个 **emoji**!')
+def login_user(username,password):
+   if c.execute('SELECT username FROM userstable WHERE username = %s',(username)):
+       c.execute('SELECT * FROM userstable WHERE username = %s AND password = %s',(username,password))
+       data=c.fetchall()
+       return data
+   else:
+       st.warning("用户名不存在，请先选择注册按钮完成注册。")
 
-with col3:
-  if user_food != '':
-    st.write(f'🍴 **{user_food}** 是你最喜欢的 **食物**!')
-  else:
-    st.write('👈 请选择你最喜欢的 **食物**!')
+def view_all_users():
+   c.execute('SELECT * FROM userstable')
+   data = c.fetchall()
+   return data
 
 
-import streamlit as st
 
-st.title('年龄和性别')
+def main():
+   menu = ["首页","登录","注册", "注销"]
 
-# 添加滑动条组件，用于选择年龄
-age = st.slider('请选择您的年龄', 0, 130, 25)
+   if 'count' not in st.session_state:
+       st.session_state.count = 0
 
-# 添加单选框组件，用于选择性别
-gender = st.radio('请选择您的性别', ('男', '女'))
+   choice = st.sidebar.selectbox("选项",menu)
+   st.sidebar.markdown(
+   """
+   <style>
+   [data-testid="stSidebar"][aria-expanded="true"] > div:first-child {
+       width: 250px;
+   }
+   [data-testid="stSidebar"][aria-expanded="false"] > div:first-child {
+       width: 250px;
+       margin-left: -250px;
+   }
+   </style>
+   """,
+   unsafe_allow_html=True,)
 
-# 添加按钮，用于记录年龄和性别并显示结果
-if st.button('上传'):
-    st.write(f'您选择的年龄是：{age} 岁，性别是：{gender}')
+   if choice =="首页":
+       st.subheader("首页")
+       st.write('这个网站展示了如何识别猫猫和狗狗')
+       st.image('https://streamlit.io/images/brand/streamlit-logo-secondary-colormark-darktext.png', width=250)
+       c1, c2 = st.columns(2)
+       with c1:
+          st.header("A cat")
+          st.image("https://static.streamlit.io/examples/cat.jpg")
+       with c2:
+           st.header("A dog")
+           st.image("https://static.streamlit.io/examples/dog.jpg")
 
-# 加载训练好的模型
-model = load_model('maogou.h5')
+   elif choice =="登录":
+       st.sidebar.subheader("登录区域")
 
-# 添加文件上传组件，用户可以上传待分类的图像
-uploaded_file = st.file_uploader("当你不知道如何区分图片中的猫狗的时候，请选择一张图片上传", type=["jpg", "jpeg", "png"])
+       username = st.sidebar.text_input("用户名")
+       password = st.sidebar.text_input("密码",type = "password")
+       if st.sidebar.checkbox("开始登录"):
+           logged_user = login_user(username,password)
+           if logged_user:
 
-# 如果用户上传了图像
-if uploaded_file is not None:
-    # 加载图像
-    img = load_img(uploaded_file, target_size=(150, 150))
-    # 将图像转化为numpy数组
-    x = np.expand_dims(img, axis=0)
-    # 对图像进行预处理
-    x = x / 255.0
-    # 使用模型进行预测
-    prediction = model.predict(x)
-    # 根据预测结果显示对应的标签
-    if prediction < 0.5:
-        st.write("这是一张猫的图片")
-    else:
-        st.write("这是一张狗的图片")
-    # 显示上传的图像
-    st.image(img, caption='Uploaded Image', use_column_width=True)
-st.header('')
+               st.session_state.count += 1
 
-option = st.selectbox(
-     '你最喜欢的动物是?',
-     ('修狗', '小猫'))
+               if st.session_state.count >= 1:
 
-st.write('你最喜欢的动物是 ', option)
-import time
+                   st.sidebar.success("您已登录成功，您的用户名是 {}".format(username))
 
-my_bar = st.progress(0)
-for percent_complete in range(100):
-     time.sleep(0.005)
-     my_bar.progress(percent_complete + 1)
+                   st.title("成功登录后可以看到的内容")
+                   st.balloons()
+                   st.header('欢迎光临')
+                   uploaded_file = st.file_uploader("当你不知道如何区分图片中的猫狗的时候，请选择一张图片上传",type=["jpg", "jpeg", "png"])
+                   if uploaded_file is not None:
+                      img = load_img(uploaded_file, target_size=(150, 150))
+                      x = np.expand_dims(img, axis=0)
+                      x = x / 255.0
+                      prediction = model.predict(x)
+                      if prediction < 0.5:
+                         st.write("这是一张猫的图片")
+                      else:
+                         st.write("这是一张狗的图片")
+                      st.image(img, caption='Uploaded Image', use_column_width=True)
+                   
+           else:
+               st.sidebar.warning("用户名或者密码不正确，请检查后重试。")   
 
-st.balloons()
+   elif choice =="注册":
+       st.subheader("注册")
+       new_user = st.sidebar.text_input("用户名")
+       new_password = st.sidebar.text_input("密码",type = "password")
+
+       if st.sidebar.button("注册"):
+            create_usertable()
+            add_userdata(new_user,new_password)
+
+   elif choice =="注销":
+        st.session_state.count = 0
+        if st.session_state.count == 0:
+            st.info("您已成功注销，如果需要，请选择左侧的登录按钮继续登录。")
+
+
+if __name__ == '__main__':
+   main()
